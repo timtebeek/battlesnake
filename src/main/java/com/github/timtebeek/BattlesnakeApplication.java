@@ -2,8 +2,10 @@ package com.github.timtebeek;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.List;
 import java.util.function.Predicate;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.*;
 import com.sun.net.httpserver.SimpleFileServer.OutputLevel;
 
@@ -55,6 +57,8 @@ public class BattlesnakeApplication {
 
 class GameHandler implements HttpHandler {
 
+	private static final ObjectMapper mapper = new ObjectMapper();
+
 	void start(HttpExchange exchange) throws IOException {
 		// TODO Initialize Game state from exchange body
 		ok("start").handle(exchange);
@@ -62,7 +66,8 @@ class GameHandler implements HttpHandler {
 
 	@Override
 	public void handle(HttpExchange exchange) throws IOException {
-		byte[] requestBody = exchange.getRequestBody().readAllBytes();
+		PostBody postBody = mapper.readValue(exchange.getRequestBody(), PostBody.class);
+		System.out.println(postBody);
 
 		// TODO Determine next move
 		String move = "up";
@@ -75,4 +80,77 @@ class GameHandler implements HttpHandler {
 		// TODO Clean Game state
 		ok("end").handle(exchange);
 	}
+
+}
+
+record PostBody(
+		Game game,
+		int turn,
+		Board board,
+		Battlesnake you) {
+}
+
+record Game(
+		String id,
+		Ruleset ruleset,
+		String map,
+		int timeout,
+		String source) {
+}
+
+record Ruleset(
+		String name,
+		String version,
+		RulesetSettings settings) {
+}
+
+record RulesetSettings(
+		int foodSpawnChance,
+		int minimumFood,
+		int hazardDamagePerTurn,
+		Royale royale,
+		Squad squad) {
+}
+
+record Royale(int shrinkEveryNTurns) {
+}
+
+record Squad(
+		boolean allowBodyCollisions,
+		boolean sharedElimination,
+		boolean sharedHealth,
+		boolean sharedLength) {
+}
+
+record Battlesnake(
+		String id,
+		String name,
+		int health,
+		List<Point> body,
+		String latency,
+		Point head,
+		int length,
+		String shout,
+		String squad,
+		Customizations customizations) {
+}
+
+record Customizations(
+		String required,
+		String author,
+		String color,
+		String head,
+		String tail,
+		String version) {
+}
+
+record Point(int x, int y) {
+}
+
+record Board(
+		int height,
+		int width,
+		List<Point> food,
+		List<Point> hazards,
+		List<Battlesnake> snakes) {
 }
