@@ -112,7 +112,7 @@ class BattlesnakeApplicationTest {
 				    }
 				  }
 				}""";
-		PostBody postBody = new ObjectMapper().readValue(sampleMoveRequest, PostBody.class);
+		RequestBody postBody = new ObjectMapper().readValue(sampleMoveRequest, RequestBody.class);
 		System.out.println(postBody);
 		assertThat(postBody).isNotNull();
 	}

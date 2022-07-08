@@ -2,14 +2,12 @@ package com.github.timtebeek;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
-import java.util.function.Predicate;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.*;
 import com.sun.net.httpserver.SimpleFileServer.OutputLevel;
-
-import static com.github.timtebeek.BattlesnakeApplication.ok;
 
 public class BattlesnakeApplication {
 
@@ -24,66 +22,72 @@ public class BattlesnakeApplication {
 			}
 			""";
 
-	private static final Headers HEADERS = Headers.of("Content-Type", "application/json");
-
 	public static void main(String[] args) throws IOException {
-		GameHandler gameHandler = new GameHandler();
-
 		// https://docs.battlesnake.com/references/api
-		var handlerChain = HttpHandlers.handleOrElse(
-				match("POST", "/move"), gameHandler,
-				HttpHandlers.handleOrElse(
-						match("GET", "/"), ok(PERSONALIZATION),
-						HttpHandlers.handleOrElse(
-								match("POST", "/start"), gameHandler::start,
-								HttpHandlers.handleOrElse(
-										match("POST", "/end"), gameHandler::end,
-										HttpHandlers.of(400, HEADERS, "{}")))));
+		HttpHandler handler = HttpHandlers.handleOrElse(
+				request -> "POST".equals(request.getRequestMethod()),
+				new GameHandler(),
+				HttpHandlers.of(200, Headers.of("Content-Type", "application/json"), PERSONALIZATION));
 		Filter filter = SimpleFileServer.createOutputFilter(System.out, OutputLevel.INFO);
-		var server = HttpServer.create(new InetSocketAddress(8080), 10, "/", handlerChain, filter);
+		var server = HttpServer.create(new InetSocketAddress(8080), 10, "/", handler, filter);
 		server.start();
-	}
-
-	private static Predicate<Request> match(String method, String path) {
-		return request -> method.equals(request.getRequestMethod())
-				&& path.equals(request.getRequestURI().getPath());
-	}
-
-	static HttpHandler ok(String body) {
-		return HttpHandlers.of(200, HEADERS, body);
 	}
 
 }
 
 class GameHandler implements HttpHandler {
 
+	private static final String EMPTY_STRING = "";
 	private static final ObjectMapper mapper = new ObjectMapper();
-
-	void start(HttpExchange exchange) throws IOException {
-		// TODO Initialize Game state from exchange body
-		ok("start").handle(exchange);
-	}
 
 	@Override
 	public void handle(HttpExchange exchange) throws IOException {
-		PostBody postBody = mapper.readValue(exchange.getRequestBody(), PostBody.class);
+		// Read request body
+		RequestBody postBody = mapper.readValue(exchange.getRequestBody(), RequestBody.class);
 		System.out.println(postBody);
 
-		// TODO Determine next move
-		String move = "up";
+		// Determine response
+		String path = exchange.getRequestURI().getPath();
+		String responseBody = switch (path) {
+		case "/start" -> start(postBody);
+		case "/move" -> move(postBody).name();
+		case "/end" -> end(postBody);
+		default -> throw new IllegalArgumentException("Unexpected value: " + path);
+		};
 
-		String responseBody = "{\"move\": \"%s\"}".formatted(move);
-		ok(responseBody).handle(exchange);
+		// Write response
+		final var bytes = responseBody.getBytes(StandardCharsets.UTF_8);
+		exchange.getResponseHeaders().add("Content-Type", "application/json");
+		if (bytes.length == 0) {
+			exchange.sendResponseHeaders(200, -1);
+		} else {
+			exchange.sendResponseHeaders(200, bytes.length);
+			exchange.getResponseBody().write(bytes);
+		}
 	}
 
-	void end(HttpExchange exchange) throws IOException {
+	private String start(RequestBody postBody) {
+		// TODO Initialize Game state from exchange body
+		return EMPTY_STRING;
+	}
+
+	private Move move(RequestBody postBody) {
+		// TODO Determine next move
+		return Move.up;
+	}
+
+	private String end(RequestBody postBody) {
 		// TODO Clean Game state
-		ok("end").handle(exchange);
+		return EMPTY_STRING;
 	}
 
 }
 
-record PostBody(
+enum Move {
+	up, right, down, left;
+}
+
+record RequestBody(
 		Game game,
 		int turn,
 		Board board,
