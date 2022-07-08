@@ -11,6 +11,7 @@ import com.sun.net.httpserver.SimpleFileServer.OutputLevel;
 
 public class BattlesnakeApplication {
 
+	// TODO Personalize
 	private static final String PERSONALIZATION = """
 			{
 			  "apiversion": "1",
@@ -25,8 +26,7 @@ public class BattlesnakeApplication {
 	public static void main(String[] args) throws IOException {
 		// https://docs.battlesnake.com/references/api
 		HttpHandler handler = HttpHandlers.handleOrElse(
-				request -> "POST".equals(request.getRequestMethod()),
-				new GameHandler(),
+				request -> "POST".equals(request.getRequestMethod()), new GameHandler(),
 				HttpHandlers.of(200, Headers.of("Content-Type", "application/json"), PERSONALIZATION));
 		Filter filter = SimpleFileServer.createOutputFilter(System.out, OutputLevel.INFO);
 		var server = HttpServer.create(new InetSocketAddress(8080), 10, "/", handler, filter);
@@ -50,7 +50,7 @@ class GameHandler implements HttpHandler {
 		String path = exchange.getRequestURI().getPath();
 		String responseBody = switch (path) {
 		case "/start" -> start(postBody);
-		case "/move" -> move(postBody).name();
+		case "/move" -> "{\"move\": \"%s\"}".formatted(move(postBody));
 		case "/end" -> end(postBody);
 		default -> throw new IllegalArgumentException("Unexpected value: " + path);
 		};
